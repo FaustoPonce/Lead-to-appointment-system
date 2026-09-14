@@ -1,0 +1,143 @@
+﻿{
+    "name":  "Lead — Handle workflow errors",
+    "description":  null,
+    "active":  false,
+    "isArchived":  false,
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.errorTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       0,
+                                       0
+                                   ],
+                      "id":  "3866cb40-f855-41d1-85f6-13434387e3e0",
+                      "name":  "Error Trigger"
+                  },
+                  {
+                      "parameters":  {
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "lead-workflow-errors"
+                                                         },
+                                         "columns":  {
+                                                         "mappingMode":  "defineBelow",
+                                                         "value":  {
+                                                                       "occurredAt":  "={{ $now.toUTC().toISO() }}",
+                                                                       "workflowName":  "={{ $json.workflow.name }}",
+                                                                       "executionId":  "={{ $json.execution.id.toString() }}",
+                                                                       "executionUrl":  "={{ $json.execution.url }}",
+                                                                       "failedNode":  "={{ $json.execution.lastNodeExecuted }}",
+                                                                       "errorMessage":  "={{ $json.execution.error.message }}"
+                                                                   },
+                                                         "matchingColumns":  {
+
+                                                                             },
+                                                         "schema":  [
+                                                                        {
+                                                                            "id":  "occurredAt",
+                                                                            "displayName":  "occurredAt",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "workflowName",
+                                                                            "displayName":  "workflowName",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "executionId",
+                                                                            "displayName":  "executionId",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "executionUrl",
+                                                                            "displayName":  "executionUrl",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "failedNode",
+                                                                            "displayName":  "failedNode",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "errorMessage",
+                                                                            "displayName":  "errorMessage",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        }
+                                                                    ],
+                                                         "attemptToConvertTypes":  false,
+                                                         "convertFieldsToString":  false
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       224,
+                                       0
+                                   ],
+                      "id":  "38bd11b8-6db1-41e9-96af-9d18c97c649f",
+                      "name":  "Log workflow error"
+                  }
+              ],
+    "connections":  {
+                        "Error Trigger":  {
+                                              "main":  {
+                                                           "node":  "Log workflow error",
+                                                           "type":  "main",
+                                                           "index":  0
+                                                       }
+                                          }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate"
+                 },
+    "nodeGroups":  {
+
+                   },
+    "tags":  {
+
+             },
+    "staticData":  null,
+    "pinData":  {
+
+                }
+}

@@ -1,0 +1,163 @@
+﻿{
+    "name":  "Lead — Retry failed HubSpot deliveries",
+    "description":  null,
+    "active":  false,
+    "isArchived":  false,
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       0,
+                                       0
+                                   ],
+                      "id":  "3feb0a82-3e9f-445f-b5bb-26f7fef0fb2c",
+                      "name":  "When clicking ‘Execute workflow’"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "get",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "failed-lead-deliveries"
+                                                         },
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyName":  "failedStep",
+                                                                            "keyValue":  "hubspot_contact_sync"
+                                                                        }
+                                                     },
+                                         "returnAll":  true
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       224,
+                                       0
+                                   ],
+                      "id":  "5feb2bc0-66e8-4d2e-995e-7b06f0b8077c",
+                      "name":  "Get row(s)"
+                  },
+                  {
+                      "parameters":  {
+                                         "authentication":  "appToken",
+                                         "email":  "={{ $json.email }}",
+                                         "additionalFields":  {
+                                                                  "companyName":  "={{ $json.company }}",
+                                                                  "customPropertiesUi":  {
+                                                                                             "customPropertiesValues":  [
+                                                                                                                            {
+                                                                                                                                "property":  "lead_service",
+                                                                                                                                "value":  "={{ ({ automation: \u0027Automation\u0027, consulting: \u0027Consulting\u0027, web_development: \u0027Web development\u0027, other: \u0027Other\u0027 })[$json.service] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_timeline",
+                                                                                                                                "value":  "={{ ({ asap: \u0027As soon as possible\u0027, this_month: \u0027This month\u0027, exploring: \u0027Exploring options\u0027 })[$json.timeline] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_priority",
+                                                                                                                                "value":  "={{ ({ high: \u0027High\u0027, normal: \u0027Normal\u0027, low: \u0027Low\u0027 })[$json.priority] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_locale",
+                                                                                                                                "value":  "={{ ({ en: \u0027English\u0027, es: \u0027Spanish\u0027 })[$json.locale] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_message",
+                                                                                                                                "value":  "={{ $json.message }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_summary",
+                                                                                                                                "value":  "={{ $json.summary }}"
+                                                                                                                            }
+                                                                                                                        ]
+                                                                                         },
+                                                                  "firstName":  "={{ (() =\u003e { const parts = $json.fullName.trim().split(/\\s+/); return parts.length \u003e 1 ? parts.slice(0, -1).join(\u0027 \u0027) : $json.fullName; })() }}",
+                                                                  "lastName":  "={{ (() =\u003e { const parts = $json.fullName.trim().split(/\\s+/); return parts.length \u003e 1 ? parts.at(-1) : \u0027\u0027; })() }}",
+                                                                  "phoneNumber":  "={{ $json.phone }}"
+                                                              },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.hubspot",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       448,
+                                       0
+                                   ],
+                      "id":  "6e13e1ca-7690-48f3-94ec-560396ec955d",
+                      "name":  "Create or update a contact",
+                      "onError":  "continueErrorOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "deleteRows",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "failed-lead-deliveries"
+                                                         },
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyValue":  "={{ $(\u0027Get row(s)\u0027).item.json.id }}"
+                                                                        }
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       672,
+                                       -96
+                                   ],
+                      "id":  "0151a068-f36f-48a7-b9a4-dad38b0fee80",
+                      "name":  "Remove recovered failure"
+                  }
+              ],
+    "connections":  {
+                        "When clicking ‘Execute workflow’":  {
+                                                                 "main":  {
+                                                                              "node":  "Get row(s)",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                             },
+                        "Get row(s)":  {
+                                           "main":  {
+                                                        "node":  "Create or update a contact",
+                                                        "type":  "main",
+                                                        "index":  0
+                                                    }
+                                       },
+                        "Create or update a contact":  {
+                                                           "main":  {
+                                                                        "node":  "Remove recovered failure",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                       }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate"
+                 },
+    "nodeGroups":  {
+
+                   },
+    "tags":  {
+
+             },
+    "staticData":  null,
+    "pinData":  {
+
+                }
+}

@@ -21,8 +21,10 @@ type LandingCopy = {
     message: string;
     consent: string;
     submit: string;
+    submitting: string;
     invalidField: string;
     success: string;
+    submissionError: string;
     serviceOptions: Record<"automation" | "consulting" | "web_development" | "other", string>;
     timelineOptions: Record<"asap" | "this_month" | "exploring", string>;
   };
@@ -64,10 +66,11 @@ const copy: Record<Locale, LandingCopy> = {
       timeline: "Estimated timeline",
       message: "Tell me about the project",
       consent: "I agree to be contacted about this request.",
-      submit: "Validate request",
+      submit: "Send request",
+      submitting: "Sending request...",
       invalidField: "Review this field and try again.",
-      success:
-        "Your information is ready. Sending it to the automation is the next integration step.",
+      success: "Thanks. Your request was received and I will review it shortly.",
+      submissionError: "Your request could not be sent. Please try again.",
       serviceOptions: {
         automation: "Automation",
         consulting: "Consulting",
@@ -116,10 +119,11 @@ const copy: Record<Locale, LandingCopy> = {
       timeline: "Plazo estimado",
       message: "Contame sobre el proyecto",
       consent: "Acepto que me contacten sobre esta consulta.",
-      submit: "Validar consulta",
+      submit: "Enviar consulta",
+      submitting: "Enviando consulta...",
       invalidField: "Revisá este campo e intentá nuevamente.",
-      success:
-        "Tu información está lista. Enviar la consulta a la automatización es el próximo paso de integración.",
+      success: "Gracias. Recibí tu consulta y la voy a revisar a la brevedad.",
+      submissionError: "No se pudo enviar tu consulta. Intentá nuevamente.",
       serviceOptions: {
         automation: "Automatización",
         consulting: "Consultoría",

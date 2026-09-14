@@ -1,0 +1,475 @@
+﻿{
+    "name":  "Lead — Sync Calendly bookings",
+    "description":  null,
+    "active":  false,
+    "isArchived":  false,
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "fieldToSplitOut":  "collection",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.splitOut",
+                      "typeVersion":  1,
+                      "position":  [
+                                       672,
+                                       0
+                                   ],
+                      "id":  "5cca5074-de93-4592-b987-9937a7af1a8d",
+                      "name":  "Split Out"
+                  },
+                  {
+                      "parameters":  {
+                                         "fieldToSplitOut":  "collection",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.splitOut",
+                      "typeVersion":  1,
+                      "position":  [
+                                       1120,
+                                       0
+                                   ],
+                      "id":  "41c3e4eb-0996-4439-881b-2a8a083f06c1",
+                      "name":  "Split Out1"
+                  },
+                  {
+                      "parameters":  {
+                                         "authentication":  "appToken",
+                                         "email":  "={{ $json.email }}",
+                                         "additionalFields":  {
+                                                                  "customPropertiesUi":  {
+                                                                                             "customPropertiesValues":  [
+                                                                                                                            {
+                                                                                                                                "property":  "calendly_booking_status",
+                                                                                                                                "value":  "={{ $json.status }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "calendly_booking_start_utc",
+                                                                                                                                "value":  "={{ $(\u0027Split Out\u0027).item.json.start_time }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "calendly_meeting_url",
+                                                                                                                                "value":  "={{ $(\u0027Split Out\u0027).item.json.location.join_url }}"
+                                                                                                                            }
+                                                                                                                        ]
+                                                                                         },
+                                                                  "firstName":  "={{ $json.name }}"
+                                                              },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.hubspot",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       1808,
+                                       80
+                                   ],
+                      "id":  "64477937-c01f-4b2c-92d2-f4d47831d9e9",
+                      "name":  "Create or update a contact"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "rowNotExists",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "processed-calendly-events"
+                                                         },
+                                         "matchType":  "allConditions",
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyName":  "eventKey",
+                                                                            "keyValue":  "={{ $json.event }}"
+                                                                        }
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1568,
+                                       144
+                                   ],
+                      "id":  "00800c32-b752-40c6-b8cf-e7cc37f052d1",
+                      "name":  "If row does not exist"
+                  },
+                  {
+                      "parameters":  {
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "processed-calendly-events"
+                                                         },
+                                         "columns":  {
+                                                         "mappingMode":  "defineBelow",
+                                                         "value":  {
+                                                                       "eventKey":  "={{ $(\u0027Split Out1\u0027).item.json.event }}"
+                                                                   },
+                                                         "matchingColumns":  "eventKey",
+                                                         "schema":  {
+                                                                        "id":  "eventKey",
+                                                                        "displayName":  "eventKey",
+                                                                        "required":  false,
+                                                                        "defaultMatch":  false,
+                                                                        "display":  true,
+                                                                        "type":  "string",
+                                                                        "readOnly":  false,
+                                                                        "removed":  false
+                                                                    },
+                                                         "attemptToConvertTypes":  false,
+                                                         "convertFieldsToString":  false
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       2032,
+                                       96
+                                   ],
+                      "id":  "7b15f2e7-42d8-447c-8299-2922c1dd6333",
+                      "name":  "Insert row"
+                  },
+                  {
+                      "parameters":  {
+                                         "rule":  {
+                                                      "interval":  {
+                                                                       "field":  "minutes",
+                                                                       "minutesInterval":  15
+                                                                   }
+                                                  }
+                                     },
+                      "type":  "n8n-nodes-base.scheduleTrigger",
+                      "typeVersion":  1.4,
+                      "position":  [
+                                       16,
+                                       224
+                                   ],
+                      "id":  "28a30ad1-63f1-4f79-908a-20189b6e1f0a",
+                      "name":  "Schedule Trigger"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://api.calendly.com/users/me",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "httpHeaderAuth",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.5,
+                      "position":  [
+                                       224,
+                                       0
+                                   ],
+                      "id":  "94dab4cc-89df-41b0-9e89-bbd9e51ce9c5",
+                      "name":  "Calendly — Get current user"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://api.calendly.com/scheduled_events",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "httpHeaderAuth",
+                                         "sendQuery":  true,
+                                         "queryParameters":  {
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "user",
+                                                                                        "value":  "={{ $json.resource.uri }}"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "sort",
+                                                                                        "value":  "start_time:asc"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "count",
+                                                                                        "value":  "100"
+                                                                                    }
+                                                                                ]
+                                                             },
+                                         "options":  {
+                                                         "pagination":  {
+                                                                            "pagination":  {
+                                                                                               "paginationMode":  "responseContainsNextURL",
+                                                                                               "nextURL":  "={{ $response.body.pagination.next_page }}",
+                                                                                               "paginationCompleteWhen":  "other",
+                                                                                               "completeExpression":  "={{ !$response.body.pagination.next_page }}",
+                                                                                               "limitPagesFetched":  true
+                                                                                           }
+                                                                        }
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.5,
+                      "position":  [
+                                       448,
+                                       0
+                                   ],
+                      "id":  "63a2b93a-225e-4b73-985a-fa2592f26ec1",
+                      "name":  "Calendly — List scheduled events"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{ $json.uri + \u0027/invitees\u0027 }}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "httpHeaderAuth",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.5,
+                      "position":  [
+                                       896,
+                                       0
+                                   ],
+                      "id":  "f8e35211-082a-4e56-b005-3f4db30ac69a",
+                      "name":  "Calendly — Get event invitees"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  {
+                                                                               "id":  "53f6268c-3442-43a3-b9a9-c8092447e4a4",
+                                                                               "leftValue":  "={{ $json.status }}",
+                                                                               "rightValue":  "canceled",
+                                                                               "operator":  {
+                                                                                                "type":  "string",
+                                                                                                "operation":  "equals",
+                                                                                                "name":  "filter.operator.equals"
+                                                                                            }
+                                                                           },
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       1344,
+                                       0
+                                   ],
+                      "id":  "f4d17feb-fa0d-42af-9b0e-983b4f433881",
+                      "name":  "Is booking canceled?"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "rowNotExists",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "processed-calendly-cancellations"
+                                                         },
+                                         "matchType":  "allConditions",
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyName":  "eventKey",
+                                                                            "keyValue":  "={{ $json.event }}"
+                                                                        }
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1568,
+                                       -144
+                                   ],
+                      "id":  "f69f81f1-59d4-43fa-8bae-c20feeba930a",
+                      "name":  "If cancellation not processed"
+                  },
+                  {
+                      "parameters":  {
+                                         "authentication":  "appToken",
+                                         "email":  "={{ $json.email }}",
+                                         "additionalFields":  {
+                                                                  "customPropertiesUi":  {
+                                                                                             "customPropertiesValues":  [
+                                                                                                                            {
+                                                                                                                                "property":  "calendly_booking_start_utc",
+                                                                                                                                "value":  "={{ $(\u0027Split Out\u0027).item.json.start_time }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "calendly_booking_status",
+                                                                                                                                "value":  "={{ $json.status }}"
+                                                                                                                            }
+                                                                                                                        ]
+                                                                                         },
+                                                                  "firstName":  "={{ $json.name }}"
+                                                              },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.hubspot",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       1792,
+                                       -144
+                                   ],
+                      "id":  "c9d17378-b534-41b7-9396-88293f5d60f8",
+                      "name":  "Update canceled booking contact"
+                  },
+                  {
+                      "parameters":  {
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "processed-calendly-cancellations"
+                                                         },
+                                         "columns":  {
+                                                         "mappingMode":  "defineBelow",
+                                                         "value":  {
+                                                                       "eventKey":  "={{ $(\u0027Split Out1\u0027).item.json.event }}"
+                                                                   },
+                                                         "matchingColumns":  "eventKey",
+                                                         "schema":  {
+                                                                        "id":  "eventKey",
+                                                                        "displayName":  "eventKey",
+                                                                        "required":  false,
+                                                                        "defaultMatch":  false,
+                                                                        "display":  true,
+                                                                        "type":  "string",
+                                                                        "readOnly":  false,
+                                                                        "removed":  false
+                                                                    },
+                                                         "attemptToConvertTypes":  false,
+                                                         "convertFieldsToString":  false
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       2016,
+                                       -144
+                                   ],
+                      "id":  "149d7c18-e288-445f-b4f8-1c1d81680242",
+                      "name":  "Store processed cancellation"
+                  }
+              ],
+    "connections":  {
+                        "Split Out":  {
+                                          "main":  {
+                                                       "node":  "Calendly — Get event invitees",
+                                                       "type":  "main",
+                                                       "index":  0
+                                                   }
+                                      },
+                        "Split Out1":  {
+                                           "main":  {
+                                                        "node":  "Is booking canceled?",
+                                                        "type":  "main",
+                                                        "index":  0
+                                                    }
+                                       },
+                        "If row does not exist":  {
+                                                      "main":  {
+                                                                   "node":  "Create or update a contact",
+                                                                   "type":  "main",
+                                                                   "index":  0
+                                                               }
+                                                  },
+                        "Create or update a contact":  {
+                                                           "main":  {
+                                                                        "node":  "Insert row",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                       },
+                        "Schedule Trigger":  {
+                                                 "main":  {
+                                                              "node":  "Calendly — Get current user",
+                                                              "type":  "main",
+                                                              "index":  0
+                                                          }
+                                             },
+                        "Calendly — Get current user":  {
+                                                            "main":  {
+                                                                         "node":  "Calendly — List scheduled events",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                        },
+                        "Calendly — List scheduled events":  {
+                                                                 "main":  {
+                                                                              "node":  "Split Out",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                             },
+                        "Calendly — Get event invitees":  {
+                                                              "main":  {
+                                                                           "node":  "Split Out1",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                          },
+                        "Is booking canceled?":  {
+                                                     "main":  [
+                                                                  {
+                                                                      "node":  "If cancellation not processed",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  },
+                                                                  {
+                                                                      "node":  "If row does not exist",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ]
+                                                 },
+                        "If cancellation not processed":  {
+                                                              "main":  {
+                                                                           "node":  "Update canceled booking contact",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                          },
+                        "Update canceled booking contact":  {
+                                                                "main":  {
+                                                                             "node":  "Store processed cancellation",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                            }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate",
+                     "timeSavedMode":  "fixed",
+                     "errorWorkflow":  "\u003cSELECT_IMPORTED_WORKFLOW\u003e",
+                     "callerPolicy":  "workflowsFromSameOwner",
+                     "availableInMCP":  false
+                 },
+    "nodeGroups":  {
+
+                   },
+    "tags":  {
+
+             },
+    "staticData":  null,
+    "pinData":  {
+
+                }
+}

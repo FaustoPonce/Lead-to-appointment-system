@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { env } from "@/config/env";
 import { getLandingCopy } from "@/features/leads/copy";
 import {
   leadSchema,
@@ -37,14 +38,48 @@ function getErrors(input: unknown, message: string): FormErrors {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getServerErrors(payload: unknown, message: string): FormErrors {
+  if (!isRecord(payload) || !isRecord(payload.details)) {
+    return {};
+  }
+
+  const details = payload.details;
+
+  return {
+    fullName: typeof details.fullName === "string" ? message : undefined,
+    email: typeof details.email === "string" ? message : undefined,
+    phone: typeof details.phone === "string" ? message : undefined,
+    company: typeof details.company === "string" ? message : undefined,
+    service: typeof details.service === "string" ? message : undefined,
+    timeline: typeof details.timeline === "string" ? message : undefined,
+    message: typeof details.message === "string" ? message : undefined,
+    consent: typeof details.consent === "string" ? message : undefined,
+  };
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export function LeadForm({ locale }: LeadFormProps) {
   const copy = getLandingCopy(locale).form;
   const [errors, setErrors] = useState<FormErrors>({});
-  const [isValidated, setIsValidated] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string>();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsValidated(false);
+    setIsSubmitted(false);
+    setSubmissionError(undefined);
 
     const formData = new FormData(event.currentTarget);
     const lead = {
@@ -62,13 +97,46 @@ export function LeadForm({ locale }: LeadFormProps) {
 
     setErrors(nextErrors);
 
-    if (Object.keys(nextErrors).length === 0) {
-      setIsValidated(true);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    const parsedLead = leadSchema.safeParse(lead);
+
+    if (!parsedLead.success) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(env.NEXT_PUBLIC_N8N_LEAD_WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(parsedLead.data),
+      });
+
+      if (response.ok) {
+        setIsSubmitted(true);
+        return;
+      }
+
+      if (response.status === 400) {
+        setErrors(getServerErrors(await readJson(response), copy.invalidField));
+      }
+
+      setSubmissionError(copy.submissionError);
+    } catch {
+      setSubmissionError(copy.submissionError);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <form className="grid gap-5" noValidate onSubmit={handleSubmit}>
+    <form aria-busy={isSubmitting} className="grid gap-5" noValidate onSubmit={handleSubmit}>
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField error={errors.fullName} label={copy.fullName} name="fullName" required />
         <FormField error={errors.email} label={copy.email} name="email" required type="email" />
@@ -99,16 +167,22 @@ export function LeadForm({ locale }: LeadFormProps) {
         <span>{copy.consent}</span>
       </label>
       {errors.consent ? <p className="-mt-3 text-sm text-red-700">{errors.consent}</p> : null}
-      {isValidated ? (
+      {submissionError ? (
+        <p aria-live="polite" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+          {submissionError}
+        </p>
+      ) : null}
+      {isSubmitted ? (
         <p aria-live="polite" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {copy.success}
         </p>
       ) : null}
       <button
-        className="rounded-xl bg-accent px-5 py-3 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+        className="rounded-xl bg-accent px-5 py-3 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-400"
+        disabled={isSubmitting}
         type="submit"
       >
-        {copy.submit}
+        {isSubmitting ? copy.submitting : copy.submit}
       </button>
     </form>
   );
@@ -127,14 +201,14 @@ function FormField({ error, hint, label, name, required, type = "text" }: FormFi
   const errorId = `${name}-error`;
 
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-800">
+    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-800">
       <span>
         {label} {hint ? <span className="font-normal text-slate-500">({hint})</span> : null}
       </span>
       <input
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
-        className="rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
+        className="w-full min-w-0 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
         name={name}
         required={required}
         type={type}
@@ -156,12 +230,12 @@ function SelectField({ children, error, label, name, required }: SelectFieldProp
   const errorId = `${name}-error`;
 
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-800">
+    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-800">
       <span>{label}</span>
       <select
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
-        className="rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
+        className="w-full min-w-0 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
         defaultValue=""
         name={name}
         required={required}
@@ -184,12 +258,12 @@ function TextAreaField({ error, label, name, required }: TextAreaFieldProps) {
   const errorId = `${name}-error`;
 
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-800">
+    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-800">
       <span>{label}</span>
       <textarea
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
-        className="min-h-32 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
+        className="min-h-32 w-full min-w-0 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
         name={name}
         required={required}
       />

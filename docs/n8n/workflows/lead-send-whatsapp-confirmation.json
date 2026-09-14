@@ -1,0 +1,82 @@
+﻿{
+    "name":  "Lead — Send WhatsApp lead confirmation",
+    "description":  null,
+    "active":  false,
+    "isArchived":  false,
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "workflowInputs":  {
+                                                                "values":  [
+                                                                               {
+                                                                                   "name":  "fullName"
+                                                                               },
+                                                                               {
+                                                                                   "name":  "phone"
+                                                                               },
+                                                                               {
+                                                                                   "name":  "locale"
+                                                                               }
+                                                                           ]
+                                                            }
+                                     },
+                      "type":  "n8n-nodes-base.executeWorkflowTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       0,
+                                       0
+                                   ],
+                      "id":  "d656f316-f9a6-43b5-8100-4138823c50a3",
+                      "name":  "When Executed by Another Workflow"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://graph.facebook.com/v\u003cAPI_VERSION\u003e/\u003cWHATSAPP_PHONE_NUMBER_ID\u003e/messages",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "httpHeaderAuth",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n{\n  messaging_product: \u0027whatsapp\u0027,\n  to: $json.phone.replace(/\\D/g, \u0027\u0027),\n  type: \u0027text\u0027,\n  text: {\n    body: $json.locale === \u0027en\u0027\n      ? `Hi ${$json.fullName}, we received your inquiry. You can book a 30-minute discovery call here: https://calendly.com/\u003cYOUR_SCHEDULING_LINK\u003e\n      : `Hola ${$json.fullName}, recibimos tu consulta. Podés reservar una llamada de descubrimiento de 30 minutos acá: https://calendly.com/\u003cYOUR_SCHEDULING_LINK\u003e\n  },\n}\n}}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.5,
+                      "position":  [
+                                       224,
+                                       0
+                                   ],
+                      "id":  "27086104-e06d-40b1-9328-7ea6c664e301",
+                      "name":  "HTTP Request"
+                  }
+              ],
+    "connections":  {
+                        "When Executed by Another Workflow":  {
+                                                                  "main":  {
+                                                                               "node":  "HTTP Request",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                              }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate",
+                     "timeSavedMode":  "fixed",
+                     "errorWorkflow":  "\u003cSELECT_IMPORTED_WORKFLOW\u003e",
+                     "callerPolicy":  "workflowsFromSameOwner",
+                     "availableInMCP":  false
+                 },
+    "nodeGroups":  {
+
+                   },
+    "tags":  {
+
+             },
+    "staticData":  null,
+    "pinData":  {
+
+                }
+}

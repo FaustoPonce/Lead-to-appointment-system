@@ -1,0 +1,498 @@
+﻿{
+    "name":  "Lead — Retry failed Ollama classification",
+    "description":  null,
+    "active":  false,
+    "isArchived":  false,
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       0,
+                                       0
+                                   ],
+                      "id":  "0e8db7b5-8791-4177-a164-183514a146ea",
+                      "name":  "When clicking ‘Execute workflow’"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "get",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "failed-lead-deliveries"
+                                                         },
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyName":  "failedStep",
+                                                                            "keyValue":  "ollama_classification"
+                                                                        }
+                                                     },
+                                         "returnAll":  true
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       224,
+                                       0
+                                   ],
+                      "id":  "e8df5ac5-6e60-4196-b6b1-d8be97b07b71",
+                      "name":  "Get row(s)"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "http://\u003cOLLAMA_HOST\u003e:11434/api/chat",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n(() =\u003e {\n  return {\n    model: \u0027qwen3.5:9b\u0027,\n    stream: false,\n    think: false,\n    options: { temperature: 0 },\n    format: {\n      type: \u0027object\u0027,\n      properties: {\n        priority: { type: \u0027string\u0027, enum: [\u0027high\u0027, \u0027normal\u0027, \u0027low\u0027] },\n        manualReview: { type: \u0027boolean\u0027 },\n        summary: { type: \u0027string\u0027, minLength: 10, maxLength: 280 },\n      },\n      required: [\u0027priority\u0027, \u0027manualReview\u0027, \u0027summary\u0027],\n      additionalProperties: false,\n    },\n    messages: [\n      {\n        role: \u0027user\u0027,\n        content: `Classify this inbound lead. Return only the requested JSON.\nRules:\n- high: urgent and concrete project.\n- normal: clear project without immediate urgency.\n- low: a concrete project or desired outcome with low urgency.\n- manualReview: true when the message does not state a clear task, desired outcome, or minimally actionable scope; also when data is ambiguous, contradictory, or insufficient.\n- Write summary in locale provided.\n- Do not decide whether to contact, reject, book, or send a message.\nLead:\n${JSON.stringify({\n  locale: $json.locale,\n  service: $json.service,\n  timeline: $json.timeline,\n  company: $json.company,\n  message: $json.message,\n})}`,\n      },\n    ],\n  };\n})()\n}}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.5,
+                      "position":  [
+                                       448,
+                                       0
+                                   ],
+                      "id":  "bd5c53a1-539f-424a-9afc-6a07dd0750df",
+                      "name":  "Classify retry lead (Ollama)",
+                      "onError":  "continueErrorOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  {
+                                                                                 "id":  "64b02130-7474-43a8-86b5-f924e1155f40",
+                                                                                 "name":  "classification",
+                                                                                 "value":  "={{ (() =\u003e {   try {     const value = JSON.parse($json.message?.content ?? \u0027\u0027);     const allowedPriorities = [\u0027high\u0027, \u0027normal\u0027, \u0027low\u0027];     const allowedKeys = [\u0027priority\u0027, \u0027manualReview\u0027, \u0027summary\u0027];      const valid =       value \u0026\u0026       typeof value === \u0027object\u0027 \u0026\u0026       !Array.isArray(value) \u0026\u0026       Object.keys(value).length === allowedKeys.length \u0026\u0026       Object.keys(value).every((key) =\u003e allowedKeys.includes(key)) \u0026\u0026       allowedPriorities.includes(value.priority) \u0026\u0026       typeof value.manualReview === \u0027boolean\u0027 \u0026\u0026       typeof value.summary === \u0027string\u0027 \u0026\u0026       value.summary.trim().length \u003e= 10 \u0026\u0026       value.summary.trim().length \u003c= 280;      if (!valid) {       return {         valid: false,         error: \u0027The model response does not match the classification schema.\u0027,       };     }      return {       valid: true,       priority: value.priority,       manualReview: value.manualReview,       summary: value.summary.trim(),     };   } catch {     return {       valid: false,       error: \u0027The model response is not valid JSON.\u0027,     };   } })() }}",
+                                                                                 "type":  "object"
+                                                                             }
+                                                         },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.5,
+                      "position":  [
+                                       672,
+                                       -96
+                                   ],
+                      "id":  "821e7c71-edf8-4479-bf2f-6f71e5247a8d",
+                      "name":  "Validate retry classification"
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  {
+                                                                                 "id":  "aa704813-8379-44e4-a675-d04b668731c6",
+                                                                                 "name":  "classification",
+                                                                                 "value":  "={{\n(() =\u003e {\n  const timeline = $(\u0027Get row(s)\u0027).item.json.timeline;\n  const priorityByTimeline = {\n    asap: \u0027high\u0027,\n    this_month: \u0027normal\u0027,\n    exploring: \u0027low\u0027,\n  };\n\n  return {\n    ...$json.classification,\n    aiPriority: $json.classification.priority,\n    priority: priorityByTimeline[timeline] ?? \u0027low\u0027,\n  };\n})()\n}}",
+                                                                                 "type":  "object"
+                                                                             }
+                                                         },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.5,
+                      "position":  [
+                                       896,
+                                       -96
+                                   ],
+                      "id":  "193827c9-ff99-431c-99c0-41d759b07e41",
+                      "name":  "Set retry operational priority"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  {
+                                                                               "id":  "3d75d5a3-704c-4f25-ba84-f78678dcbc3d",
+                                                                               "leftValue":  "={{ $json.classification.valid \u0026\u0026 !$json.classification.manualReview \u0026\u0026 $json.classification.priority !== \u0027low\u0027 }}",
+                                                                               "rightValue":  "",
+                                                                               "operator":  {
+                                                                                                "type":  "boolean",
+                                                                                                "operation":  "true",
+                                                                                                "singleValue":  true
+                                                                                            }
+                                                                           },
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       1120,
+                                       -96
+                                   ],
+                      "id":  "2a4059c4-603d-4d50-aed8-a9d1f4d4e089",
+                      "name":  "Eligible retry for automation"
+                  },
+                  {
+                      "parameters":  {
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "manual-review-leads"
+                                                         },
+                                         "columns":  {
+                                                         "mappingMode":  "defineBelow",
+                                                         "value":  {
+                                                                       "emailKey":  "={{ $(\u0027Get row(s)\u0027).item.json.emailKey }}",
+                                                                       "fullName":  "={{ $(\u0027Get row(s)\u0027).item.json.fullName }}",
+                                                                       "email":  "={{ $(\u0027Get row(s)\u0027).item.json.email }}",
+                                                                       "phone":  "={{ $(\u0027Get row(s)\u0027).item.json.phone }}",
+                                                                       "company":  "={{ $(\u0027Get row(s)\u0027).item.json.company }}",
+                                                                       "locale":  "={{ $(\u0027Get row(s)\u0027).item.json.locale }}",
+                                                                       "service":  "={{ $(\u0027Get row(s)\u0027).item.json.service }}",
+                                                                       "timeline":  "={{ $(\u0027Get row(s)\u0027).item.json.timeline }}",
+                                                                       "message":  "={{ $(\u0027Get row(s)\u0027).item.json.message }}",
+                                                                       "reviewReason":  "={{ $json.classification.valid ? \u0027manual_review_requested\u0027 : ($json.classification.error ?? \u0027invalid_model_output\u0027) }}",
+                                                                       "priority":  "={{ $json.classification.priority ?? \u0027\u0027 }}",
+                                                                       "summary":  "={{ $json.classification.summary ?? \u0027\u0027 }}"
+                                                                   },
+                                                         "matchingColumns":  {
+
+                                                                             },
+                                                         "schema":  [
+                                                                        {
+                                                                            "id":  "emailKey",
+                                                                            "displayName":  "emailKey",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "fullName",
+                                                                            "displayName":  "fullName",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "email",
+                                                                            "displayName":  "email",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "phone",
+                                                                            "displayName":  "phone",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "company",
+                                                                            "displayName":  "company",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "locale",
+                                                                            "displayName":  "locale",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "service",
+                                                                            "displayName":  "service",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "timeline",
+                                                                            "displayName":  "timeline",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "message",
+                                                                            "displayName":  "message",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "reviewReason",
+                                                                            "displayName":  "reviewReason",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "priority",
+                                                                            "displayName":  "priority",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "summary",
+                                                                            "displayName":  "summary",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        }
+                                                                    ],
+                                                         "attemptToConvertTypes":  false,
+                                                         "convertFieldsToString":  false
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1344,
+                                       0
+                                   ],
+                      "id":  "dc6adca5-cc66-44b6-b3a9-0e114cec689a",
+                      "name":  "Queue recovered manual review"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "deleteRows",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "failed-lead-deliveries"
+                                                         },
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyValue":  "={{ $(\u0027Get row(s)\u0027).item.json.id }}"
+                                                                        }
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1568,
+                                       0
+                                   ],
+                      "id":  "64f15f53-e0eb-4b74-92d7-81308be2efae",
+                      "name":  "Remove recovered Ollama failure"
+                  },
+                  {
+                      "parameters":  {
+                                         "authentication":  "appToken",
+                                         "email":  "={{ $(\u0027Get row(s)\u0027).item.json.email }}",
+                                         "additionalFields":  {
+                                                                  "companyName":  "={{ $(\u0027Get row(s)\u0027).item.json.company }}",
+                                                                  "customPropertiesUi":  {
+                                                                                             "customPropertiesValues":  [
+                                                                                                                            {
+                                                                                                                                "property":  "lead_service",
+                                                                                                                                "value":  "={{ ({ automation: \u0027Automation\u0027, consulting: \u0027Consulting\u0027, web_development: \u0027Web development\u0027, other: \u0027Other\u0027 })[$(\u0027Get row(s)\u0027).item.json.service] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_timeline",
+                                                                                                                                "value":  "={{ ({ asap: \u0027As soon as possible\u0027, this_month: \u0027This month\u0027, exploring: \u0027Exploring options\u0027 })[$(\u0027Get row(s)\u0027).item.json.timeline] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_priority",
+                                                                                                                                "value":  "={{ ({ high: \u0027High\u0027, normal: \u0027Normal\u0027, low: \u0027Low\u0027 })[$json.classification.priority] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_locale",
+                                                                                                                                "value":  "={{ ({ en: \u0027English\u0027, es: \u0027Spanish\u0027 })[$(\u0027Get row(s)\u0027).item.json.locale] }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_message",
+                                                                                                                                "value":  "={{ $(\u0027Get row(s)\u0027).item.json.message }}"
+                                                                                                                            },
+                                                                                                                            {
+                                                                                                                                "property":  "lead_summary",
+                                                                                                                                "value":  "={{ $json.classification.summary }}"
+                                                                                                                            }
+                                                                                                                        ]
+                                                                                         },
+                                                                  "firstName":  "={{ (() =\u003e { const fullName = $(\u0027Get row(s)\u0027).item.json.fullName.trim(); const parts = fullName.split(/\\s+/); return parts.length \u003e 1 ? parts.slice(0, -1).join(\u0027 \u0027) : fullName; })() }}",
+                                                                  "lastName":  "={{ (() =\u003e { const parts = $(\u0027Get row(s)\u0027).item.json.fullName.trim().split(/\\s+/); return parts.length \u003e 1 ? parts.at(-1) : \u0027\u0027; })() }}",
+                                                                  "phoneNumber":  "={{ $(\u0027Get row(s)\u0027).item.json.phone }}"
+                                                              },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.hubspot",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       1344,
+                                       -192
+                                   ],
+                      "id":  "600484a4-1009-4557-a098-8bee33f103e3",
+                      "name":  "Sync recovered Ollama lead to HubSpot",
+                      "onError":  "continueErrorOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "deleteRows",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "\u003cSELECT_DATA_TABLE_ID\u003e",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "failed-lead-deliveries"
+                                                         },
+                                         "filters":  {
+                                                         "conditions":  {
+                                                                            "keyValue":  "={{ $(\u0027Get row(s)\u0027).item.json.id }}"
+                                                                        }
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTable",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1568,
+                                       -288
+                                   ],
+                      "id":  "b94656ba-9ce6-4bbd-904f-0788d49adb2b",
+                      "name":  "Remove synced Ollama failure"
+                  }
+              ],
+    "connections":  {
+                        "When clicking ‘Execute workflow’":  {
+                                                                 "main":  {
+                                                                              "node":  "Get row(s)",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                             },
+                        "Get row(s)":  {
+                                           "main":  {
+                                                        "node":  "Classify retry lead (Ollama)",
+                                                        "type":  "main",
+                                                        "index":  0
+                                                    }
+                                       },
+                        "Classify retry lead (Ollama)":  {
+                                                             "main":  {
+                                                                          "node":  "Validate retry classification",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                         },
+                        "Validate retry classification":  {
+                                                              "main":  {
+                                                                           "node":  "Set retry operational priority",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                          },
+                        "Set retry operational priority":  {
+                                                               "main":  {
+                                                                            "node":  "Eligible retry for automation",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                           },
+                        "Eligible retry for automation":  {
+                                                              "main":  [
+                                                                           {
+                                                                               "node":  "Sync recovered Ollama lead to HubSpot",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           },
+                                                                           {
+                                                                               "node":  "Queue recovered manual review",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                          },
+                        "Queue recovered manual review":  {
+                                                              "main":  {
+                                                                           "node":  "Remove recovered Ollama failure",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                          },
+                        "Sync recovered Ollama lead to HubSpot":  {
+                                                                      "main":  {
+                                                                                   "node":  "Remove synced Ollama failure",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                  }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate"
+                 },
+    "nodeGroups":  {
+
+                   },
+    "tags":  {
+
+             },
+    "staticData":  null,
+    "pinData":  {
+
+                }
+}
