@@ -1,8 +1,9 @@
 # n8n workflow exports
 
 Los exports recomendados son los de la arquitectura confiable basada en PostgreSQL y una outbox
-de WhatsApp. Se exportaron desde los workflows reales, permanecen inactivos y no contienen
-credenciales, tokens, IDs internos, URLs específicas, ejecuciones ni datos de prueba.
+de WhatsApp, más su handler compartido de fallos inesperados. Se exportaron desde los workflows
+reales, permanecen inactivos y no contienen credenciales, tokens, IDs internos, URLs específicas,
+ejecuciones ni datos de prueba.
 
 ## Arquitectura confiable (recomendada)
 
@@ -14,10 +15,11 @@ credenciales, tokens, IDs internos, URLs específicas, ejecuciones ni datos de p
 | `lead-send-whatsapp-confirmations-reliably.json` | Reclama la outbox, llama a Meta y solo completa el lead con un ID de mensaje verificable. |
 | `lead-recover-retryable-processing.json` | Recupera manualmente un caso reintentable de Ollama o HubSpot. |
 | `lead-recover-retryable-whatsapp.json` | Recupera manualmente una entrega WhatsApp reintentable. |
+| `lead-handle-workflow-errors.json` | Handler compartido con `Error Trigger`; registra solo fallos inesperados en la Data Table de observabilidad. |
 
 ### Importación segura
 
-1. Crear una carpeta o proyecto propio en n8n e importar los seis JSON recomendados. Permanecen
+1. Crear una carpeta o proyecto propio en n8n e importar los siete JSON recomendados. Permanecen
    inactivos al importarse.
 2. Crear y seleccionar manualmente las credenciales PostgreSQL, Ollama, HubSpot y Meta. Nunca
    pegar secretos dentro de los nodos ni de los exports.
@@ -25,12 +27,15 @@ credenciales, tokens, IDs internos, URLs específicas, ejecuciones ni datos de p
    identificador del número emisor, la plantilla aprobada y el enlace de agenda.
 4. Ejecutar manualmente `Lead — Initialize reliability state` una vez, con PostgreSQL ya
    configurado. Crea `lead_processing_state` y `whatsapp_delivery_state`.
-5. Volver a seleccionar los subworkflows en los nodos que muestran
+5. Crear la Data Table `lead-workflow-errors` para observabilidad, con las columnas de texto
+   `occurredAt`, `workflowName`, `executionId`, `executionUrl`, `failedNode` y `errorMessage`.
+   En `Lead — Handle workflow errors`, seleccionar esa tabla y publicarlo antes de enlazarlo.
+6. Configurar `Lead — Handle workflow errors` como handler compartido de los tres workflows de
+   la ruta confiable. El handler registra solo fallos inesperados; los estados esperados de
+   Ollama, HubSpot y Meta quedan persistidos en PostgreSQL.
+7. Volver a seleccionar los subworkflows en los nodos que muestran
    `<CONFIGURE_WORKFLOW_REFERENCE>`.
-6. Importar y publicar un workflow con `Error Trigger`; configurarlo como handler compartido de
-   los tres workflows publicados de la ruta confiable. El handler registra solo fallos inesperados;
-   los estados esperados de Ollama, HubSpot y Meta quedan persistidos en PostgreSQL.
-7. Probar con datos seguros la ruta completa y un duplicado. Publicar únicamente el ingreso,
+8. Probar con datos seguros la ruta completa y un duplicado. Publicar únicamente el ingreso,
    procesador y sender confiables después de observar las ejecuciones.
 
 ## Estados y recuperación
@@ -44,6 +49,8 @@ credenciales, tokens, IDs internos, URLs específicas, ejecuciones ni datos de p
   `2xx` sin `messages[0].id` pasa a revisión manual para evitar mensajes duplicados.
 - Los recuperadores no tienen Schedule Trigger: se ejecutan manualmente y reclaman un único caso
   recuperable por vez.
+- La Data Table `lead-workflow-errors` es solo observabilidad de errores inesperados; PostgreSQL
+  sigue siendo la fuente de verdad para el estado y la recuperación del lead.
 
 ## Exports legacy
 
@@ -56,10 +63,8 @@ Se conservan únicamente como referencia y **no deben importarse junto con la ru
 - `lead-retry-failed-ollama-classification.json`
 - `lead-test-whatsapp-cloud-api.json`
 
-`lead-handle-workflow-errors.json` es un helper histórico de observabilidad basado en la Data
-Table `lead-workflow-errors`. Puede reemplazarse por otro handler con `Error Trigger`; el requisito
-es configurar uno y vincularlo a los workflows publicados. `lead-sync-calendly-bookings.json`
-es una automatización independiente de Calendly y conserva sus marcas de idempotencia propias.
+`lead-sync-calendly-bookings.json` es una automatización independiente de Calendly y conserva sus
+marcas de idempotencia propias.
 
 ## Matriz mínima de pruebas
 
