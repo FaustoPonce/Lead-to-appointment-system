@@ -35,7 +35,7 @@ const copy: Record<Locale, LandingCopy> = {
   en: {
     language: "English",
     languageSwitch: "Ver en español",
-    eyebrow: "Independent developer",
+    eyebrow: "Software and automation studio",
     title: "Automation, consulting, and web development for your next project.",
     description:
       "Tell me what you need and I will review the context before we schedule a discovery call.",
@@ -91,7 +91,7 @@ const copy: Record<Locale, LandingCopy> = {
   es: {
     language: "Español",
     languageSwitch: "View in English",
-    eyebrow: "Desarrollador independiente",
+    eyebrow: "Estudio de software y automatización",
     title: "Automatización, consultoría y desarrollo web para tu próximo proyecto.",
     description:
       "Contame qué necesitás y reviso el contexto antes de que coordinemos una llamada de descubrimiento.",
