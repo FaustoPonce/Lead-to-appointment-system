@@ -1,0 +1,278 @@
+{
+  "name": "Lead — Receive landing lead reliably",
+  "active": false,
+  "settings": {},
+  "nodes": [
+    {
+      "name": "Receive lead (draft)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "name": "Validate and normalize lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body ?? {};\nconst fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';\nconst email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';\nconst phone = typeof body.phone === 'string' ? body.phone.replace(/\\s+/g, '') : '';\nconst company = typeof body.company === 'string' ? body.company.trim() : '';\nconst service = typeof body.service === 'string' ? body.service.trim() : '';\nconst timeline = typeof body.timeline === 'string' ? body.timeline : '';\nconst locale = body.locale === 'en' ? 'en' : body.locale === 'es' ? 'es' : '';\nconst message = typeof body.message === 'string' ? body.message.trim() : '';\nconst consent = body.consent === true;\nconst valid = fullName.length >= 2 && fullName.length <= 80\n  && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)\n  && /^\\+[1-9]\\d{7,14}$/.test(phone)\n  && company.length <= 120\n  && ['automation','consulting','web_development','other'].includes(service)\n  && ['asap','this_month','exploring'].includes(timeline)\n  && ['es','en'].includes(locale)\n  && message.length >= 10 && message.length <= 2000\n  && consent;\nif (!valid) return { json: { valid: false } };\nconst operationalPriority = ({ asap: 'high', this_month: 'normal', exploring: 'low' })[timeline];\nconst payload = { fullName, email, phone, company, service, timeline, locale, message };\nreturn { json: {\n  valid: true,\n  emailKey: email,\n  payloadBase64: Buffer.from(JSON.stringify(payload), 'utf8').toString('base64'),\n  operationalPriority,\n} };"
+      }
+    },
+    {
+      "name": "Reserve lead atomically",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH reservation AS (\n  INSERT INTO lead_processing_state (\n    email_key, raw_payload, operational_priority, state, stage, next_retry_at\n  )\n  VALUES (\n    $1,\n    convert_from(decode($2, 'base64'), 'UTF8')::jsonb,\n    $3,\n    'pending',\n    'ollama',\n    now()\n  )\n  ON CONFLICT (email_key) DO NOTHING\n  RETURNING true AS created\n)\nSELECT\n  COALESCE((SELECT created FROM reservation), false) AS created,\n  $1::text AS email_key,\n  CASE WHEN EXISTS (SELECT 1 FROM reservation) THEN 'pending' ELSE 'duplicate' END AS reservation_status;",
+        "options": {
+          "queryReplacement": "={{ [$json.emailKey, $json.payloadBase64, $json.operationalPriority].join(\",\") }}"
+        }
+      }
+    },
+    {
+      "name": "Return accepted response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": {
+          "status": "accepted",
+          "processing": true
+        },
+        "options": {
+          "responseCode": 202,
+          "enableResponseOutput": true
+        }
+      }
+    },
+    {
+      "name": "Lead payload valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Return invalid lead",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        672,
+        160
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": {
+          "status": "invalid_request"
+        },
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "name": "Reservation created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "created",
+              "leftValue": "={{ $json.created }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Return duplicate response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        160
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": {
+          "status": "already_processing",
+          "processing": false
+        },
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "name": "Start lead processor",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "workflowId": "<CONFIGURE_WORKFLOW_REFERENCE>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "emailKey": "={{ $json.email_key }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive lead (draft)": {
+      "main": [
+        [
+          {
+            "node": "Validate and normalize lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and normalize lead": {
+      "main": [
+        [
+          {
+            "node": "Lead payload valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead payload valid?": {
+      "main": [
+        [
+          {
+            "node": "Reserve lead atomically",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return invalid lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reserve lead atomically": {
+      "main": [
+        [
+          {
+            "node": "Reservation created?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservation created?": {
+      "main": [
+        [
+          {
+            "node": "Return accepted response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return duplicate response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return accepted response": {
+      "main": [
+        [
+          {
+            "node": "Start lead processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

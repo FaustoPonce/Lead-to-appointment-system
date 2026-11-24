@@ -1,0 +1,396 @@
+{
+  "name": "Lead — Process pending leads reliably",
+  "active": false,
+  "settings": {},
+  "nodes": [
+    {
+      "name": "Claim lead for processing",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH candidate AS (\n  SELECT email_key\n  FROM lead_processing_state\n  WHERE email_key = $1\n    AND state IN ('pending','retryable')\n    AND stage IN ('ollama','hubspot')\n    AND (next_retry_at IS NULL OR next_retry_at <= now())\n    AND (lease_until IS NULL OR lease_until < now())\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE lead_processing_state l\nSET lease_until = now() + interval '5 minutes', attempt_count = attempt_count + 1, updated_at = now()\nFROM candidate\nWHERE l.email_key = candidate.email_key\nRETURNING l.email_key, l.raw_payload, l.operational_priority;",
+        "options": {
+          "queryReplacement": "={{ [$json.emailKey].join(',') }}"
+        }
+      }
+    },
+    {
+      "name": "Prepare Ollama request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const lead=typeof $json.raw_payload==='string'?JSON.parse($json.raw_payload):$json.raw_payload;\nconst prompt=[\n  'Return only JSON with manualReview (boolean) and summary (string). Do not assign priority.',\n  'Set manualReview to true only for spam, abusive content, contradictory details, or an inquiry too incomplete to understand.',\n  'A coherent business inquiry with a valid requested service, company, timeline, and explanatory message is not manual review: set manualReview to false.',\n  'This lead passed schema validation and gave WhatsApp contact consent.',\n  'Lead: '+JSON.stringify(lead)\n].join(' ');\nreturn {json:{emailKey:$json.email_key,operationalPriority:$json.operational_priority,ollamaBody:{model:'qwen3.5:9b',stream:false,format:'json',options:{think:false},prompt}}};"
+      }
+    },
+    {
+      "name": "Ask Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "<CONFIGURE_URL>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.ollamaBody }}",
+        "contentType": "json",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Validate Ollama response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const claimed=$('Claim lead for processing').item.json;const status=Number($json.statusCode??0);let outcome='manual_review',summary='',failure='Ollama response did not match the required contract.';if(status===429||status>=500){outcome='retryable';failure='Ollama returned a transient failure.';}else if(status>=200&&status<300){try{const p=JSON.parse($json.body?.response??'');if(typeof p.manualReview==='boolean'&&typeof p.summary==='string'&&p.summary.trim()){outcome=p.manualReview?'manual_review':'proceed';summary=p.summary.trim().slice(0,500);failure='';}}catch{}}return {json:{emailKey:claimed.email_key,operationalPriority:claimed.operational_priority,outcome,summary,failureMessageBase64:Buffer.from(failure,'utf8').toString('base64')}};"
+      }
+    },
+    {
+      "name": "Ollama allows automation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.outcome }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "proceed"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Prepare HubSpot upsert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s=$('Validate Ollama response').item.json;\nconst c=$('Claim lead for processing').item.json;\nconst l=typeof c.raw_payload==='string'?JSON.parse(c.raw_payload):c.raw_payload;\nconst parts=l.fullName.trim().split(/\\s+/);\nconst firstName=parts.length>1?parts.slice(0,-1).join(' '):l.fullName;\nconst lastName=parts.length>1?parts.at(-1):'';\nreturn {json:{emailKey:s.emailKey,hubspotBody:{inputs:[{idProperty:'email',id:l.email,properties:{\n  email:l.email,\n  firstname:firstName,\n  lastname:lastName,\n  phone:l.phone,\n  company:l.company || '',\n  lead_service:({automation:'Automation',consulting:'Consulting',web_development:'Web development',other:'Other'})[l.service],\n  lead_timeline:({asap:'As soon as possible',this_month:'This month',exploring:'Exploring options'})[l.timeline],\n  lead_priority:({high:'High',normal:'Normal',low:'Low'})[s.operationalPriority],\n  lead_locale:({en:'English',es:'Spanish'})[l.locale],\n  lead_message:l.message,\n  lead_summary:s.summary\n}}]}}};",
+        "language": "javaScript"
+      }
+    },
+    {
+      "name": "Upsert contact in HubSpot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "<CONFIGURE_URL>",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.hubspotBody }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Validate HubSpot response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s=$('Prepare HubSpot upsert').item.json,status=Number($json.statusCode??0),id=typeof $json.body?.results?.[0]?.id==='string'?$json.body.results[0].id:'';let outcome='manual_review',failureClass='manual_review',message='HubSpot response lacked a verifiable contact id.';if(status>=200&&status<300&&id){outcome='accepted';failureClass='';message='';}else if(status===429||status>=500){outcome='retryable';failureClass='transient';message='HubSpot returned a transient failure.';}else if([400,401,403].includes(status)){outcome='permanent_failure';failureClass='permanent';message='HubSpot rejected the request permanently.';}return {json:{emailKey:s.emailKey,outcome,contactId:id,failureClass,failureMessageBase64:Buffer.from(message,'utf8').toString('base64')}};"
+      }
+    },
+    {
+      "name": "Persist HubSpot result and WhatsApp intent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH updated AS (\n  UPDATE lead_processing_state\n  SET state = CASE WHEN $2='accepted' THEN 'pending' ELSE $2 END,\n      stage = CASE WHEN $2='accepted' THEN 'whatsapp' ELSE 'hubspot' END,\n      hubspot_status = $2,\n      hubspot_contact_id = NULLIF($3,'__none__'),\n      failure_class = NULLIF($4,'__none__'),\n      failure_code = CASE WHEN $2='accepted' THEN NULL ELSE $2 END,\n      failure_message = NULLIF(convert_from(decode($5,'base64'),'UTF8'),'_'),\n      next_retry_at = CASE WHEN $2='retryable' THEN now()+interval '5 minutes' ELSE NULL END,\n      lease_until = NULL, updated_at = now()\n  WHERE email_key = $1\n  RETURNING email_key\n), outbox AS (\n  INSERT INTO whatsapp_delivery_state(email_key,status,next_retry_at)\n  SELECT email_key,'pending',now() FROM updated WHERE $2='accepted'\n  ON CONFLICT(email_key) DO NOTHING\n)\nSELECT email_key FROM updated WHERE $2='accepted';",
+        "options": {
+          "queryReplacement": "={{ [$json.emailKey,$json.outcome,$json.contactId || '__none__',$json.failureClass || '__none__',$json.failureMessageBase64 || 'Xw=='].join(',') }}"
+        }
+      }
+    },
+    {
+      "name": "Persist Ollama non-success",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE lead_processing_state SET state=CASE WHEN $2='retryable' THEN 'retryable' ELSE 'manual_review' END,stage='ollama',ollama_status=$2,failure_class=CASE WHEN $2='retryable' THEN 'transient' ELSE 'manual_review' END,failure_code=$2,failure_message=NULLIF(convert_from(decode($3,'base64'),'UTF8'),'_'),next_retry_at=CASE WHEN $2='retryable' THEN now()+interval '5 minutes' ELSE NULL END,lease_until=NULL,updated_at=now() WHERE email_key=$1;",
+        "options": {
+          "queryReplacement": "={{ [$json.emailKey,$json.outcome,$json.failureMessageBase64 || 'Xw=='].join(',') }}"
+        }
+      }
+    },
+    {
+      "name": "Receive lead job",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "emailKey",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Start WhatsApp worker",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2688,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "workflowId": "<CONFIGURE_WORKFLOW_REFERENCE>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "emailKey": "={{ $json.emailKey }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "emailKey",
+              "displayName": "emailKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "name": "Prepare WhatsApp job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const verified = $('Validate HubSpot response').first().json;\nreturn { json: { emailKey: verified.emailKey } };",
+        "language": "javaScript"
+      }
+    }
+  ],
+  "connections": {
+    "Claim lead for processing": {
+      "main": [
+        [
+          {
+            "node": "Prepare Ollama request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Ollama request": {
+      "main": [
+        [
+          {
+            "node": "Ask Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Ollama": {
+      "main": [
+        [
+          {
+            "node": "Validate Ollama response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Ollama response": {
+      "main": [
+        [
+          {
+            "node": "Ollama allows automation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama allows automation?": {
+      "main": [
+        [
+          {
+            "node": "Prepare HubSpot upsert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Persist Ollama non-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare HubSpot upsert": {
+      "main": [
+        [
+          {
+            "node": "Upsert contact in HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert contact in HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Validate HubSpot response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate HubSpot response": {
+      "main": [
+        [
+          {
+            "node": "Persist HubSpot result and WhatsApp intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive lead job": {
+      "main": [
+        [
+          {
+            "node": "Claim lead for processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist HubSpot result and WhatsApp intent": {
+      "main": [
+        [
+          {
+            "node": "Prepare WhatsApp job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare WhatsApp job": {
+      "main": [
+        [
+          {
+            "node": "Start WhatsApp worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

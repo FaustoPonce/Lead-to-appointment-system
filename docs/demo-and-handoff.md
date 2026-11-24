@@ -47,7 +47,7 @@ Errores de cualquiera de los workflows anteriores
 | `Lead — Recover retryable processing (manual)` | Manual | Reclama un caso reintentable de Ollama o HubSpot. |
 | `Lead — Recover retryable WhatsApp (manual)` | Manual | Reclama una entrega WhatsApp reintentable. |
 | `Lead — Sync Calendly bookings` | Schedule Trigger, cada 15 minutos | Lee eventos paginados, sincroniza reservas activas y procesa cancelaciones sin duplicar efectos. |
-| `Lead — Handle workflow errors` | Error Trigger | Guarda fecha, workflow, ejecución, nodo y mensaje de cualquier fallo en `lead-workflow-errors`. |
+| `Lead — Handle workflow errors` | Error Trigger | Handler compartido de los tres workflows confiables; guarda fecha, workflow, ejecución, nodo y mensaje de fallos inesperados en `lead-workflow-errors`. |
 
 ## Estado operativo y evidencia
 
@@ -60,7 +60,8 @@ Errores de cualquiera de los workflows anteriores
   llegaron al destinatario de prueba con el nombre dinámico y el enlace de Calendly.
 - La sincronización de Calendly procesó una reserva activa y una segunda ejecución no duplicó HubSpot ni la marca de procesado.
 - La paginación de Calendly está configurada para seguir la URL siguiente, con límite de seguridad de 100 páginas.
-- El workflow de errores guardó tanto un evento de prueba como errores reales del workflow padre y del hijo.
+- El handler de errores está vinculado a los tres workflows confiables. Los fallos esperados de Ollama, HubSpot y Meta se conservan como estados recuperables en PostgreSQL.
+- El sender legacy de WhatsApp quedó despublicado para evitar reutilización accidental.
 
 ### Estado transaccional
 
@@ -84,7 +85,7 @@ Errores de cualquiera de los workflows anteriores
    sin revelar credenciales ni números personales.
 6. Mostrar el contacto creado/actualizado en HubSpot y sus propiedades de Calendly.
 7. Mostrar `Lead — Sync Calendly bookings`, su Schedule Trigger, paginación e
-   idempotencia con las Data Tables.
+   idempotencia con sus marcas de procesado.
 8. Mostrar `lead-workflow-errors` como evidencia de observabilidad. No provocar fallos para la
    grabación: ya existen registros reales de prueba.
 9. Mostrar la rama de cancelación en el canvas como capacidad implementada; aclarar que la

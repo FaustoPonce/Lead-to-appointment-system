@@ -1,0 +1,92 @@
+{
+  "name": "Lead — Recover retryable processing (manual)",
+  "active": false,
+  "settings": {},
+  "nodes": [
+    {
+      "name": "Run processing recovery manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Claim one retryable processing lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH candidate AS (SELECT email_key FROM lead_processing_state WHERE state='retryable' AND stage IN ('ollama','hubspot') AND next_retry_at <= now() AND (lease_until IS NULL OR lease_until < now()) ORDER BY next_retry_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE lead_processing_state l SET state='pending', next_retry_at=now(), updated_at=now() FROM candidate WHERE l.email_key=candidate.email_key RETURNING l.email_key;",
+        "options": {}
+      }
+    },
+    {
+      "name": "Resume lead processor",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "workflowId": "<CONFIGURE_WORKFLOW_REFERENCE>",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "emailKey": "={{ $json.email_key }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "emailKey",
+              "displayName": "emailKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run processing recovery manually": {
+      "main": [
+        [
+          {
+            "node": "Claim one retryable processing lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim one retryable processing lead": {
+      "main": [
+        [
+          {
+            "node": "Resume lead processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

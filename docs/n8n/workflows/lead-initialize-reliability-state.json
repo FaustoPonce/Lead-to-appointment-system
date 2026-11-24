@@ -1,0 +1,46 @@
+{
+  "name": "Lead — Initialize reliability state",
+  "active": false,
+  "settings": {},
+  "nodes": [
+    {
+      "name": "Manual initialization only",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Create reliability state tables",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS lead_processing_state (\n  email_key text PRIMARY KEY,\n  raw_payload jsonb NOT NULL,\n  operational_priority text NOT NULL CHECK (operational_priority IN ('high', 'normal', 'low')),\n  state text NOT NULL CHECK (state IN ('pending', 'retryable', 'manual_review', 'permanent_failure', 'completed')),\n  stage text NOT NULL CHECK (stage IN ('ollama', 'hubspot', 'whatsapp', 'completed')),\n  ollama_status text NOT NULL DEFAULT 'pending',\n  hubspot_status text NOT NULL DEFAULT 'pending',\n  hubspot_contact_id text,\n  attempt_count integer NOT NULL DEFAULT 0,\n  next_retry_at timestamptz,\n  lease_until timestamptz,\n  failure_class text,\n  failure_code text,\n  failure_message text,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS whatsapp_delivery_state (\n  email_key text PRIMARY KEY REFERENCES lead_processing_state(email_key),\n  status text NOT NULL CHECK (status IN ('pending', 'retryable', 'accepted', 'permanent_failure', 'manual_review')),\n  attempt_count integer NOT NULL DEFAULT 0,\n  next_retry_at timestamptz,\n  lease_until timestamptz,\n  last_http_status integer,\n  last_error_class text,\n  last_error_code text,\n  last_error_message text,\n  meta_message_id text,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now()\n);",
+        "options": {
+          "queryBatching": "transaction"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual initialization only": {
+      "main": [
+        [
+          {
+            "node": "Create reliability state tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
