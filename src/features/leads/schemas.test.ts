@@ -5,7 +5,7 @@ const validLead = {
   locale: "es",
   fullName: "Test User",
   email: "test@example.com",
-  phone: "+54 11 5555 5555",
+  phone: "+5491155555555",
   company: "",
   service: "automation",
   timeline: "this_month",
@@ -24,5 +24,10 @@ describe("leadSchema", () => {
 
   it("requiere consentimiento", () => {
     expect(leadSchema.safeParse({ ...validLead, consent: false }).success).toBe(false);
+  });
+
+  it("requiere un número internacional posible", () => {
+    expect(leadSchema.safeParse({ ...validLead, phone: "343 698-5959" }).success).toBe(false);
+    expect(leadSchema.safeParse({ ...validLead, phone: "+5412" }).success).toBe(false);
   });
 });

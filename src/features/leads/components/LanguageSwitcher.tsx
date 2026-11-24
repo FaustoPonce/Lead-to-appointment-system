@@ -12,7 +12,7 @@ export function LanguageSwitcher({ locale }: LanguageSwitcherProps) {
 
   return (
     <Link
-      className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
+      className="border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:border-accent hover:text-accent"
       href={`/${alternativeLocale}`}
       lang={alternativeLocale}
     >

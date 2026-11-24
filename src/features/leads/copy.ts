@@ -7,7 +7,7 @@ type LandingCopy = {
   title: string;
   description: string;
   primaryAction: string;
-  services: Array<{ title: string; description: string }>;
+  services: Array<{ title: string; description: string; details: string[] }>;
   form: {
     title: string;
     description: string;
@@ -44,14 +44,17 @@ const copy: Record<Locale, LandingCopy> = {
       {
         title: "Automation",
         description: "Connect repetitive work into reliable, maintainable workflows.",
+        details: ["Repeated processes", "Tool integrations", "Clear state tracking"],
       },
       {
         title: "Consulting",
         description: "Define a practical technical path before investing in implementation.",
+        details: ["Technical diagnosis", "Scope and priorities", "Implementation decisions"],
       },
       {
         title: "Web development",
         description: "Build focused web products with a clear business purpose.",
+        details: ["Landing pages and products", "Connected forms", "Clear user experiences"],
       },
     ],
     form: {
@@ -65,11 +68,11 @@ const copy: Record<Locale, LandingCopy> = {
       service: "What do you need help with?",
       timeline: "Estimated timeline",
       message: "Tell me about the project",
-      consent: "I agree to be contacted about this request.",
+      consent: "I agree to be contacted on WhatsApp about this request.",
       submit: "Send request",
       submitting: "Sending request...",
       invalidField: "Review this field and try again.",
-      success: "Thanks. Your request was received and I will review it shortly.",
+      success: "Thanks. Your request was received. You will receive a WhatsApp confirmation shortly.",
       submissionError: "Your request could not be sent. Please try again.",
       serviceOptions: {
         automation: "Automation",
@@ -97,14 +100,17 @@ const copy: Record<Locale, LandingCopy> = {
       {
         title: "Automatización",
         description: "Conectá tareas repetitivas en flujos confiables y mantenibles.",
+        details: ["Procesos repetitivos", "Integraciones entre herramientas", "Seguimiento claro de estados"],
       },
       {
         title: "Consultoría",
         description: "Definí un camino técnico práctico antes de invertir en implementación.",
+        details: ["Diagnóstico técnico", "Alcance y prioridades", "Decisiones de implementación"],
       },
       {
         title: "Desarrollo web",
         description: "Construí productos web enfocados en una necesidad de negocio clara.",
+        details: ["Landing pages y productos", "Formularios conectados", "Experiencias claras"],
       },
     ],
     form: {
@@ -118,11 +124,11 @@ const copy: Record<Locale, LandingCopy> = {
       service: "¿En qué necesitás ayuda?",
       timeline: "Plazo estimado",
       message: "Contame sobre el proyecto",
-      consent: "Acepto que me contacten sobre esta consulta.",
+      consent: "Acepto que me contacten por WhatsApp sobre esta consulta.",
       submit: "Enviar consulta",
       submitting: "Enviando consulta...",
       invalidField: "Revisá este campo e intentá nuevamente.",
-      success: "Gracias. Recibí tu consulta y la voy a revisar a la brevedad.",
+      success: "Gracias. Recibí tu consulta. Vas a recibir una confirmación por WhatsApp a la brevedad.",
       submissionError: "No se pudo enviar tu consulta. Intentá nuevamente.",
       serviceOptions: {
         automation: "Automatización",

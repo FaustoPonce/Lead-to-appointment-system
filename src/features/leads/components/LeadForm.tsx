@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import PhoneInput from "react-phone-number-input";
+import englishPhoneLabels from "react-phone-number-input/locale/en.json";
+import spanishPhoneLabels from "react-phone-number-input/locale/es.json";
 import { env } from "@/config/env";
 import { getLandingCopy } from "@/features/leads/copy";
 import {
@@ -72,6 +75,7 @@ async function readJson(response: Response): Promise<unknown> {
 export function LeadForm({ locale }: LeadFormProps) {
   const copy = getLandingCopy(locale).form;
   const [errors, setErrors] = useState<FormErrors>({});
+  const [phone, setPhone] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submissionError, setSubmissionError] = useState<string>();
@@ -86,7 +90,7 @@ export function LeadForm({ locale }: LeadFormProps) {
       locale,
       fullName: formData.get("fullName"),
       email: formData.get("email"),
-      phone: formData.get("phone"),
+      phone: phone ?? "",
       company: formData.get("company"),
       service: formData.get("service"),
       timeline: formData.get("timeline"),
@@ -136,13 +140,19 @@ export function LeadForm({ locale }: LeadFormProps) {
   }
 
   return (
-    <form aria-busy={isSubmitting} className="grid gap-5" noValidate onSubmit={handleSubmit}>
-      <div className="grid gap-5 sm:grid-cols-2">
+    <form aria-busy={isSubmitting} className="grid gap-6" noValidate onSubmit={handleSubmit}>
+      <div className="grid gap-6 sm:grid-cols-2">
         <FormField error={errors.fullName} label={copy.fullName} name="fullName" required />
         <FormField error={errors.email} label={copy.email} name="email" required type="email" />
       </div>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <FormField error={errors.phone} label={copy.phone} name="phone" required type="tel" />
+      <div className="grid gap-6 sm:grid-cols-2">
+        <PhoneField
+          error={errors.phone}
+          label={copy.phone}
+          locale={locale}
+          onChange={setPhone}
+          value={phone}
+        />
         <FormField hint={copy.companyOptional} label={copy.company} name="company" />
       </div>
       <SelectField error={errors.service} label={copy.service} name="service" required>
@@ -162,23 +172,23 @@ export function LeadForm({ locale }: LeadFormProps) {
         ))}
       </SelectField>
       <TextAreaField error={errors.message} label={copy.message} name="message" required />
-      <label className="flex gap-3 text-sm leading-6 text-slate-700">
-        <input className="mt-1 size-4 accent-accent" name="consent" type="checkbox" />
+      <label className="flex gap-3 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+        <input className="mt-1 size-4 shrink-0 accent-accent" name="consent" type="checkbox" />
         <span>{copy.consent}</span>
       </label>
       {errors.consent ? <p className="-mt-3 text-sm text-red-700">{errors.consent}</p> : null}
       {submissionError ? (
-        <p aria-live="polite" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p aria-live="polite" className="bg-red-50 px-4 py-3 text-sm text-red-800">
           {submissionError}
         </p>
       ) : null}
       {isSubmitted ? (
-        <p aria-live="polite" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <p aria-live="polite" className="bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {copy.success}
         </p>
       ) : null}
       <button
-        className="rounded-xl bg-accent px-5 py-3 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-400"
+        className="bg-slate-700 px-5 py-3.5 font-semibold text-white shadow-lg shadow-slate-700/20 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none disabled:hover:translate-y-0"
         disabled={isSubmitting}
         type="submit"
       >
@@ -192,7 +202,7 @@ type FormFieldProps = {
   error?: string;
   hint?: string;
   label: string;
-  name: "fullName" | "email" | "phone" | "company";
+  name: "fullName" | "email" | "company";
   required?: boolean;
   type?: "email" | "tel" | "text";
 };
@@ -201,17 +211,49 @@ function FormField({ error, hint, label, name, required, type = "text" }: FormFi
   const errorId = `${name}-error`;
 
   return (
-    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-800">
-      <span>
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-800">
+      <span className="tracking-tight">
         {label} {hint ? <span className="font-normal text-slate-500">({hint})</span> : null}
       </span>
       <input
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
-        className="w-full min-w-0 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
+        className="w-full min-w-0 border border-slate-200 bg-slate-50 px-3.5 py-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-accent focus:bg-white focus:ring-4 focus:ring-blue-100"
         name={name}
         required={required}
         type={type}
+      />
+      {error ? <span className="text-sm font-normal text-red-700" id={errorId}>{error}</span> : null}
+    </label>
+  );
+}
+
+type PhoneFieldProps = {
+  error?: string;
+  label: string;
+  locale: Locale;
+  onChange: (value: string | undefined) => void;
+  value: string | undefined;
+};
+
+function PhoneField({ error, label, locale, onChange, value }: PhoneFieldProps) {
+  const errorId = "phone-error";
+
+  return (
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-800">
+      <span className="tracking-tight">{label}</span>
+      <PhoneInput
+        aria-describedby={error ? errorId : undefined}
+        aria-invalid={Boolean(error)}
+        autoComplete="tel"
+        className={error ? "PhoneInput--error" : undefined}
+        defaultCountry={locale === "es" ? "AR" : undefined}
+        international
+        labels={locale === "es" ? spanishPhoneLabels : englishPhoneLabels}
+        name="phone"
+        onChange={onChange}
+        required
+        value={value}
       />
       {error ? <span className="text-sm font-normal text-red-700" id={errorId}>{error}</span> : null}
     </label>
@@ -230,12 +272,12 @@ function SelectField({ children, error, label, name, required }: SelectFieldProp
   const errorId = `${name}-error`;
 
   return (
-    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-800">
-      <span>{label}</span>
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-800">
+      <span className="tracking-tight">{label}</span>
       <select
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
-        className="w-full min-w-0 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
+        className="w-full min-w-0 border border-slate-200 bg-slate-50 px-3.5 py-3 text-base text-slate-950 outline-none transition hover:border-slate-300 focus:border-accent focus:bg-white focus:ring-4 focus:ring-blue-100"
         defaultValue=""
         name={name}
         required={required}
@@ -258,12 +300,12 @@ function TextAreaField({ error, label, name, required }: TextAreaFieldProps) {
   const errorId = `${name}-error`;
 
   return (
-    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-800">
-      <span>{label}</span>
+    <label className="grid min-w-0 gap-2 text-sm font-semibold text-slate-800">
+      <span className="tracking-tight">{label}</span>
       <textarea
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
-        className="min-h-32 w-full min-w-0 rounded-xl border border-border bg-white px-3 py-3 text-base outline-none transition focus:border-accent focus:ring-2 focus:ring-blue-100"
+        className="min-h-32 w-full min-w-0 resize-y border border-slate-200 bg-slate-50 px-3.5 py-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-accent focus:bg-white focus:ring-4 focus:ring-blue-100"
         name={name}
         required={required}
       />

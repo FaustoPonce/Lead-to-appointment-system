@@ -6,6 +6,7 @@ import { env } from "@/config/env";
 import { getLandingCopy } from "@/features/leads/copy";
 import { isLocale, locales } from "@/i18n/locales";
 import "../globals.css";
+import "react-phone-number-input/style.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

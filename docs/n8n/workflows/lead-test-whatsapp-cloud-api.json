@@ -25,7 +25,7 @@
                                          "genericAuthType":  "httpHeaderAuth",
                                          "sendBody":  true,
                                          "specifyBody":  "json",
-                                         "jsonBody":  "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"543436985959\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Hola, recibimos tu consulta. Podés reservar una llamada de descubrimiento de 30 minutos acá: https://calendly.com/\u003cYOUR_SCHEDULING_LINK\u003e\"\n  }\n}",
+                                         "jsonBody":  "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"<TEST_RECIPIENT_E164_WITHOUT_PLUS>\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Hola, recibimos tu consulta. Podés reservar una llamada de descubrimiento de 30 minutos acá: https://calendly.com/\u003cYOUR_SCHEDULING_LINK\u003e\"\n  }\n}",
                                          "options":  {
 
                                                      }

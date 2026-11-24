@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPossiblePhoneNumber } from "react-phone-number-input";
 import { locales } from "@/i18n/locales";
 
 export const serviceOptions = [
@@ -21,9 +22,8 @@ export const leadSchema = z.object({
   phone: z
     .string()
     .trim()
-    .min(7)
-    .max(30)
-    .regex(/^[+0-9()\-\s]+$/),
+    .regex(/^\+[1-9]\d{1,14}$/)
+    .refine(isPossiblePhoneNumber),
   company: z.string().trim().max(120),
   service: z.enum(serviceOptions),
   timeline: z.enum(timelineOptions),

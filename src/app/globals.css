@@ -23,3 +23,31 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+.PhoneInput {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.75rem 0.875rem;
+  transition: border-color 150ms, box-shadow 150ms, background-color 150ms;
+}
+
+.PhoneInput:hover {
+  border-color: #cbd5e1;
+}
+
+.PhoneInput:focus-within {
+  border-color: var(--accent);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px #dbeafe;
+}
+
+.PhoneInput--error {
+  border-color: #b91c1c;
+}
+
+.PhoneInputInput {
+  min-width: 0;
+  background: transparent;
+  color: #020617;
+  outline: none;
+}
