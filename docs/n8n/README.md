@@ -72,3 +72,59 @@ espacios o guiones no agrega un prefijo que falta.
 - No incluye la configuración de Docker ni la base de datos de n8n.
 - El flujo de cancelación de Calendly está implementado, pero debe validarse con una cancelación
   real y segura antes de considerarlo listo para producción.
+
+## Confiabilidad publicada (PostgreSQL)
+
+La instancia local usa PostgreSQL como fuente de verdad para el ingreso, la deduplicación y la
+entrega de WhatsApp. Los JSON públicos históricos continúan documentando el flujo anterior basado
+en Data Tables; no representan la configuración local publicada de confiabilidad.
+
+- `Lead — Initialize reliability state` crea `lead_processing_state` y
+  `whatsapp_delivery_state`; ejecutarlo una sola vez y únicamente con una credencial PostgreSQL
+  creada manualmente.
+- `Lead — Receive landing lead reliably` es el webhook publicado de la landing. Valida, normaliza y reserva atómicamente el
+  email. Responde `202`; un duplicado no repite efectos.
+- `Lead — Process pending leads reliably` usa solamente la prioridad operativa derivada
+  de `timeline`: `asap` → `high`, `this_month` → `normal`, `exploring` → `low`. Ollama solo
+  decide si requiere revisión manual y aporta resumen. Recupera tanto `ollama` como `hubspot`
+  cuando quedaron en estado `retryable`.
+- `Lead — Send WhatsApp confirmations reliably` reclama una intención con lease. Solo reintenta
+  `429` y `5xx`; `400`, `401` y `403` quedan como fallos permanentes. Un `2xx` sin
+  `messages[0].id` o un error de transporte pasa a revisión manual para evitar duplicados.
+  Si no encuentra una intención reclamable, finaliza sin enviar nada.
+- `Lead — Recover retryable processing (manual)` y `Lead — Recover retryable WhatsApp (manual)`
+  reclaman, respectivamente, un único caso recuperable y lo reenvían al worker correspondiente.
+  No tienen Schedule Trigger ni se publican: se ejecutan de forma manual durante una revisión.
+- `Lead — Test Ollama reliability classification (manual)` y
+  `Lead — Test Meta reliability classification (manual)` son pruebas aisladas, inactivas y sin
+  efectos externos; verifican las clasificaciones de fallos de cada integración.
+
+Antes de ejecutar una copia importada, configurar manualmente PostgreSQL, HubSpot y Meta; además,
+reemplazar el placeholder del identificador del número emisor de WhatsApp. Ningún workflow se
+activa por importarlo o guardarlo.
+
+### Matriz mínima de pruebas
+
+| Caso | Resultado esperado |
+| --- | --- |
+| Mismo email enviado dos veces | Una sola reserva; el segundo envío no llama a Ollama, HubSpot ni WhatsApp. |
+| Falla transitoria de Ollama | `retryable` en etapa `ollama`; no hay contacto ni intención WhatsApp. |
+| Respuesta inválida de Ollama | `manual_review`; no se automatiza. |
+| Falla transitoria de HubSpot | `retryable` en etapa `hubspot`; no se crea intención WhatsApp. |
+| Éxito HubSpot | Crea una sola intención WhatsApp pendiente. |
+| Meta 429/5xx | Intención `retryable` con backoff; no se marca el lead completo. |
+| Meta 400/401/403 | Fallo permanente; sin reintento automático. |
+| Meta 2xx sin ID de mensaje / timeout | Revisión manual; sin reintento automático. |
+| Meta 2xx con `messages[0].id` | Intención `accepted` y lead `completed`. |
+| Cada plazo | `asap` = `high`, `this_month` = `normal`, `exploring` = `low` en HubSpot y estado. |
+
+### Evidencia local verificada el 2026-11-24
+
+- Camino completo: reserva PostgreSQL → Ollama → HubSpot → outbox WhatsApp → respuesta de Meta
+  con ID verificable → `completed`.
+- Duplicados, prioridad por los tres plazos y respuesta `202` del ingreso.
+- Clasificación aislada de Meta: `400` permanente, `429/500` reintentable, `2xx` ambiguo a
+  revisión manual y `2xx` con ID aceptado.
+- Clasificación aislada de Ollama: `429/503` reintentable, respuesta inválida a revisión manual
+  y contrato válido que continúa.
+- Recuperación manual de etapas reintentables de Ollama, HubSpot y WhatsApp.
