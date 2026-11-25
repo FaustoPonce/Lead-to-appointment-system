@@ -97,3 +97,21 @@ Ese comando ejecuta typecheck, lint, tests y build.
 Es una demostración local, no una instalación lista para producción. Una implementación real
 requiere infraestructura siempre disponible, un número comercial de WhatsApp, monitoreo,
 protecciones de entrada y reglas de privacidad acordes al negocio que la use.
+
+## Consideraciones para producción
+
+La arquitectura de la demo prioriza mostrar el recorrido y sus mecanismos de recuperación. Antes
+de usarla con datos reales, el ingreso público y las operaciones necesitan controles adicionales:
+
+- **Entrada protegida:** el webhook debe quedar detrás de una capa de entrada propia, con límites
+  por IP, protección anti-bot, tamaño máximo de request y CORS limitado al origen de la landing.
+  La URL pública del webhook no se considera un secreto.
+- **Disponibilidad y recuperación:** PostgreSQL, n8n y los workers deben ejecutarse de forma
+  persistente. Los reintentos transitorios se programan con backoff y se supervisan; los casos de
+  revisión manual generan una alerta, en lugar de quedar pendientes sin seguimiento.
+- **Datos y secretos:** usar una base administrada con backups, acceso de red restringido y un
+  usuario de mínimo privilegio. Los tokens de proveedores viven en un gestor de secretos y se
+  rotan; nunca en el cliente, el código ni los exports de workflows.
+- **Operación y privacidad:** registrar fallos con identificadores de correlación, monitorear la
+  tasa de errores y definir el consentimiento, la retención y el acceso a los datos de cada
+  cliente antes de almacenar leads reales.
